@@ -1,0 +1,45 @@
+# 百度网盘每日自动签到
+#
+# 触发时间（UTC，需自行换算成你所在时区）：
+#   01:17 UTC = 北京时间 09:17
+#   13:17 UTC = 北京时间 21:17
+# 一天跑两次是为了容错：GitHub 定时任务在高峰期可能延迟或偶发跳过，跑两次基本不会漏签。
+# 重复签到不会报错（接口返回"今日已签到"，脚本判为正常）。
+#
+# 为什么不是整点：整点是 GitHub 全球任务最拥堵的时刻，延迟最严重。错开 17 分钟更稳。
+
+name: 百度网盘自动签到
+
+on:
+  schedule:
+    - cron: '17 1 * * *'
+    - cron: '17 13 * * *'
+  workflow_dispatch: # 手动触发，首次配置完用来验证
+
+# 同一时间只跑一个，避免两次触发撞车
+concurrency:
+  group: baidu-pan-signin
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  signin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node 环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 执行签到
+        env:
+          # 从仓库 Secret 读取完整 Cookie 串（必须同时包含 BDUSS 和 STOKEN 两个字段）
+          BAIDU_COOKIE: ${{ secrets.BAIDU_COOKIE }}
+        run: node scripts/signin.js
