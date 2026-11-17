@@ -1,0 +1,35 @@
+# 保活：防止 GitHub 自动停用定时任务
+#
+# 背景：GitHub 规定「仓库连续 60 天没有任何活动（commit / PR 等）时，会自动停用 schedule 定时任务」。
+# 光有 Actions 运行记录不算活动，必须有真实提交。
+#
+# 本工作流每月 1 号往 .keepalive 写一个时间戳并提交，制造一次真实活动，
+# 从而让签到的定时任务永久保持启用状态。你不需要做任何事。
+
+name: 保活（防止定时任务被停用）
+
+on:
+  schedule:
+    - cron: '23 2 1 * *' # 每月 1 号 UTC 02:23
+  workflow_dispatch:
+
+permissions:
+  contents: write # 需要写权限才能提交
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 写入时间戳并提交
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .keepalive
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .keepalive
+          git commit -m "chore: keepalive $(date -u +%Y-%m)" || echo "本次无变化，跳过"
+          git push
